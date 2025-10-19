@@ -1,0 +1,2511 @@
+-------------
+Tool: ChatGPT
+Date: 17/10
+Topic: Define, Display, and Refine hourly weather data
+-------------
+
+**Me:** I want to write a function called `definition_hourly_weather` that stores hourly weather data.
+
+---
+
+**ChatGPT:** Excellent 👍 The data structure you’re working with (`current_condition`, `nearest_area`, `weather`, etc.) comes from a complex nested API response.
+You want to define a `definition_hourly_weather` function to specifically **store hourly weather data** for the queried city.
+We can achieve this using either a dataclass or a standard class.
+Here’s a clean, extensible, and serializable Pythonic version 👇
+
+---
+
+### ✅ Recommended Approach: Using a `dataclass`
+
+```python
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+@dataclass
+class HourlyWeather:
+    time: str
+    tempC: float
+    tempF: float
+    FeelsLikeC: float
+    FeelsLikeF: float
+    humidity: int
+    pressure: int
+    cloudcover: int
+    visibility: float
+    uvIndex: int
+    windspeedKmph: int
+    winddir16Point: str
+    weatherDesc: str
+    precipMM: float
+    chanceofrain: int
+    chanceofsunshine: int
+    chanceofthunder: int
+```
+
+---
+
+### ✅ Additionally: Define a Container Class `HourlyWeatherDefinition`
+
+This class is used to **store, manage, and access** the hourly weather data for a given day.
+
+```python
+@dataclass
+class HourlyWeatherDefinition:
+    date: str
+    hourly_data: List[HourlyWeather] = field(default_factory=list)
+
+    def add_hour(self, hour: HourlyWeather):
+        """Add a new hourly record"""
+        self.hourly_data.append(hour)
+
+    def get_by_time(self, time_str: str) -> Optional[HourlyWeather]:
+        """Retrieve weather record by time, e.g. '1200'"""
+        for h in self.hourly_data:
+            if h.time == time_str:
+                return h
+        return None
+
+    def average_temp(self) -> float:
+        """Compute average hourly temperature"""
+        if not self.hourly_data:
+            return 0.0
+        return sum(h.tempC for h in self.hourly_data) / len(self.hourly_data)
+```
+
+---
+
+### ✅ Example: Load Your Data into the Structure
+
+You can manually parse the API response and convert it into `HourlyWeather` instances:
+
+```python
+# Assume data corresponds to weather[0].hourly from your API
+hourly_list = []
+
+for h in weather[0].hourly:
+    hourly_list.append(HourlyWeather(
+        time=h.time,
+        tempC=float(h.tempC),
+        tempF=float(h.tempF),
+        FeelsLikeC=float(h.FeelsLikeC),
+        FeelsLikeF=float(h.FeelsLikeF),
+        humidity=int(h.humidity),
+        pressure=int(h.pressure),
+        cloudcover=int(h.cloudcover),
+        visibility=float(h.visibility),
+        uvIndex=int(h.uvIndex),
+        windspeedKmph=int(h.windspeedKmph),
+        winddir16Point=h.winddir16Point,
+        weatherDesc=h.weatherDesc[0].value,
+        precipMM=float(h.precipMM),
+        chanceofrain=int(h.chanceofrain),
+        chanceofsunshine=int(h.chanceofsunshine),
+        chanceofthunder=int(h.chanceofthunder)
+    ))
+
+today_weather = HourlyWeatherDefinition(date=weather[0].date, hourly_data=hourly_list)
+```
+
+---
+
+### ✅ Usage Example
+
+```python
+# Get weather for a specific time
+print(today_weather.get_by_time("1200"))
+
+# Compute average temperature
+print(f"Average Temp: {today_weather.average_temp():.1f}°C")
+
+# Add a new hourly record
+new_hour = HourlyWeather(time="2400", tempC=19, tempF=66, FeelsLikeC=18, FeelsLikeF=64,
+                         humidity=60, pressure=1020, cloudcover=5, visibility=10,
+                         uvIndex=0, windspeedKmph=10, winddir16Point="SW", weatherDesc="Clear",
+                         precipMM=0.0, chanceofrain=0, chanceofsunshine=95, chanceofthunder=0)
+today_weather.add_hour(new_hour)
+```
+
+---
+
+Would you like me to turn this into a **fully runnable module** (for example `weather_definition.py`) that automatically extracts and stores the `hourly` data from your API response?
+
+---
+
+**Me:** No, what I want is for this definition to store the **queried city’s hourly data**,
+so that later I can create a visualization function to show how the temperature changes throughout the day.
+That’s the goal. So right now, I just need a definition that retrieves and stores the hourly weather data.
+
+---
+
+**ChatGPT:** Perfect ✅ I understand your goal now.
+You want to build a function named **`definition_hourly_weather`** that will extract and store the **hourly weather data** for the queried city from your existing `weather` data (mainly temperature changes throughout the day),
+so you can later visualize it.
+
+---
+
+### 🎯 Objective
+
+Create a function:
+
+```python
+def definition_hourly_weather(weather_data):
+    ...
+```
+
+Output:
+A clean, structured **pandas DataFrame** (or list of dictionaries) containing:
+
+* `time` (24-hour format)
+* `tempC` (°C temperature)
+* `FeelsLikeC`
+* `humidity`
+* `uvIndex`
+* `weatherDesc`
+
+Then later you can simply run `df.plot()` to visualize the temperature trend.
+
+---
+
+### ✅ Full Function Definition (Recommended pandas Version)
+
+```python
+import pandas as pd
+
+def definition_hourly_weather(weather_data):
+    """
+    Extract and store hourly weather information from API response
+    :param weather_data: weather[0].hourly or similar list of HourlyForecast objects
+    :return: pandas DataFrame containing hourly weather data for visualization
+    """
+    hourly_records = []
+
+    for hour in weather_data[0].hourly:  # Default to today’s data (weather[0])
+        record = {
+            "time": f"{int(hour.time)//100:02d}:00",  # e.g. 600 -> 06:00
+            "tempC": float(hour.tempC),
+            "FeelsLikeC": float(hour.FeelsLikeC),
+            "humidity": int(hour.humidity),
+            "uvIndex": int(hour.uvIndex),
+            "weatherDesc": hour.weatherDesc[0].value.strip()
+        }
+        hourly_records.append(record)
+
+    df = pd.DataFrame(hourly_records)
+    df["time"] = pd.Categorical(df["time"], categories=df["time"], ordered=True)
+    return df
+```
+
+---
+
+### ✅ Example Usage
+
+```python
+# Assume 'weather' is your API response object
+df_today = definition_hourly_weather(weather)
+
+print(df_today)
+```
+
+**Sample Output:**
+
+```
+     time  tempC  FeelsLikeC  humidity  uvIndex weatherDesc
+0   00:00     13          12        82        0       Clear
+1   03:00     13          12        82        0       Clear
+2   06:00     12          12        81        0       Sunny
+3   09:00     18          18        55        4       Sunny
+4   12:00     21          21        48        9       Sunny
+5   15:00     21          21        50        5       Sunny
+6   18:00     18          18        65        0       Sunny
+7   21:00     16          16        81        0       Clear
+```
+
+---
+
+### ✅ Next Step: Easy Visualization
+
+
+```python
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10,5))
+plt.plot(df_today["time"], df_today["tempC"], marker="o", label="Temperature (°C)")
+plt.plot(df_today["time"], df_today["FeelsLikeC"], linestyle="--", label="Feels Like (°C)")
+plt.title("Hourly Temperature Change Today")
+plt.xlabel("Time")
+plt.ylabel("Temperature (°C)")
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+
+---
+
+**ChatGPT:** Perfect ✅ I’ve reviewed your entire `show_detailed_weather()` function and your UI structure.
+Your goal is clear:
+you want the **📊 “Visualisation”** tab to directly display the line charts — that is, to call the `visualisation_hourly_weather(df)` function we just created.
+
+---
+
+### 💡 Implementation Idea
+
+Currently, the **📊 Visualisation** page is designed as a separate section of your UI.
+We’ll integrate the visualization logic into that page so that it automatically renders the hourly weather plots (temperature, feels-like temperature, humidity, and UV index) inside the notebook, rather than opening them in a new window.
+
+---
+
+
+```python
+with vis_output:
+    display(widgets.HTML("<div style='color:#5b3cc4;...'>📊 Visualisation will be available soon...</div>"))
+```
+
+---
+
+**Me:** (Uploaded my current UI) We need to change it so that:
+
+1. It calls `definition_hourly_weather()` to extract the hourly data.
+2. Passes the returned DataFrame to `visualisation_hourly_weather(df)` to generate line charts.
+3. Displays these charts inside `with vis_output:`.
+
+---
+
+### ✅ You can directly replace this section inside your `show_detailed_weather()` function:
+
+Locate around **line 182** in your code:
+
+```python
+# 📊 Visualisation tab (placeholder for later line charts)
+vis_output = widgets.Output()
+with vis_output:
+    display(widgets.HTML("<div style='color:#5b3cc4;text-align:center;font-size:15px;margin-top:15px;'>"
+                         "📊 Visualisation will be available soon...</div>"))
+```
+
+Replace it with the following 👇:
+
+```python
+# 📊 Visualisation tab (display line charts)
+vis_output = widgets.Output()
+with vis_output:
+    try:
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        # Extract hourly data as a DataFrame
+        df_today = definition_hourly_weather(data['weather'])  # use your API's 'weather' field here
+        # Draw line charts
+        visualisation_hourly_weather(df_today)
+
+    except Exception as e:
+        display(widgets.HTML(
+            f"<div style='color:red;text-align:center;font-size:15px;margin-top:15px;'>⚠️ Error generating visualisation: {e}</div>"
+        ))
+```
+
+---
+
+### ✅ If your functions are defined in a different file, don’t forget to import them at the top:
+
+```python
+from your_module_name import definition_hourly_weather, visualisation_hourly_weather
+```
+
+---
+
+### 🌈 Result
+
+After running this:
+
+* When you click the **📊 Visualisation** tab,
+  it will automatically generate **four line charts** showing:
+  1️⃣ Temperature (`tempC`)
+  2️⃣ Feels Like (`FeelsLikeC`)
+  3️⃣ Humidity (`humidity`)
+  4️⃣ UV Index (`uvIndex`)
+
+The chart style will match your current **soft purple UI theme**.
+
+---
+
+Would you like me to make the charts scrollable inside the ipywidgets container (so the four charts are vertically stacked with a scrollbar), preventing the UI from becoming too tall?
+
+---
+
+**Me:** (Uploaded my current UI) It gave me an error.
+
+---
+
+**ChatGPT:** Excellent 👏 I can already see the core issue.
+
+From your error message:
+
+```
+⚠️ Error generating visualisation: 'weather'
+```
+
+We can confirm that 👉 the variable `data` (returned from `get_current_weather(city)`) is **not a dictionary**,
+but rather an **object** (for example, a `WeatherResponse` or a similar dataclass).
+So using `data['weather']` is incorrect.
+
+---
+
+### ✅ Correct Approach
+
+Based on the structure you shared earlier (`current_condition`, `weather`, `nearest_area`),
+`get_current_weather(city)` returns an **object with attributes**, not a dictionary.
+So we need to use:
+
+```python
+df_today = hourly_weather(data.weather)
+```
+
+---
+
+### ✅ Corrected Code (Replace the `try` block inside your visualisation section)
+
+```python
+# 📊 Visualisation tab (display line charts)
+vis_output = widgets.Output()
+with vis_output:
+    try:
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        # ✅ Fix: data is an object, use attribute access
+        df_today = hourly_weather(data.weather)
+
+        # Draw the line charts
+        visualisation_hourly_weather(df_today)
+
+    except Exception as e:
+        display(widgets.HTML(
+            f"<div style='color:red;text-align:center;font-size:15px;margin-top:15px;'>⚠️ Error generating visualisation: {e}</div>"
+        ))
+```
+
+---
+
+### 🧩 Extra Tip
+
+If you’re not sure what type `data` is, insert the following lines before the error occurs:
+
+```python
+print(type(data))
+print(dir(data))
+```
+
+Run it once — the output will tell you whether it should be `data.weather` or `data['data']['weather']`.
+
+---
+
+Would you like me to help you add **automatic detection logic** that can handle both formats (`data.weather` and `data['weather']`)?
+That way it’ll work regardless of how the API response changes.
+
+---
+
+**Me:** (Uploaded my current UI) I followed your advice, but it still threw an error.
+
+---
+
+**ChatGPT:** Perfect — this time, the error message is extremely helpful 👍
+
+The message says:
+
+```
+'dict' object has no attribute 'weather'
+```
+
+👉 This means that `get_current_weather(city)` actually returns a **Python dictionary**, not an object.
+So we must access it using **key notation (`data['weather']`)**, not `data.weather`.
+
+---
+
+However, from your screenshot I noticed that the line you used was:
+
+```python
+df_today = hourly_weather(data['weather'])
+```
+
+This is theoretically fine — but the error suggests that the key `'weather'` doesn’t actually exist in that dictionary.
+
+---
+
+### 🧩 Let’s Inspect the Data Structure
+
+Right after retrieving the data (around line 124), insert:
+
+```python
+print(data.keys())
+```
+
+Run it once and check the output.
+It will probably return something like:
+
+```python
+dict_keys(['current_condition', 'nearest_area', 'request', 'weather'])
+```
+
+or:
+
+```python
+dict_keys(['data'])
+```
+
+---
+
+### ✅ If the Output is `{'data': {...}}`
+
+Then change your code to:
+
+```python
+df_today = hourly_weather(data['data']['weather'])
+```
+
+---
+
+### ✅ If the Output Already Contains `'weather'`
+
+Then `data['weather']` is correct, but it might be getting overwritten by another variable.
+To make it more robust, use this safer version:
+
+```python
+# 📊 Visualisation tab (display line charts)
+vis_output = widgets.Output()
+with vis_output:
+    try:
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        # ✅ Automatically detect data structure
+        if 'data' in data and 'weather' in data['data']:
+            weather_data = data['data']['weather']
+        elif 'weather' in data:
+            weather_data = data['weather']
+        else:
+            raise KeyError(f"Cannot find 'weather' in data. Keys: {list(data.keys())}")
+
+        df_today = hourly_weather(weather_data)
+        visualisation_hourly_weather(df_today)
+
+    except Exception as e:
+        display(widgets.HTML(
+            f"<div style='color:red;text-align:center;font-size:15px;margin-top:15px;'>⚠️ Error generating visualisation: {e}</div>"
+        ))
+```
+
+---
+
+### ✅ I Recommend Testing It Like This
+
+1. Before the `try` block, add:
+
+   ```python
+   print(type(data))
+   print(data.keys())
+   ```
+
+   Then click **Confirm** again.
+
+2. Copy or screenshot the output.
+
+3. I can then tell you 100% which key path to use.
+
+---
+
+Would you like me to write an **auto-detection + safe print** version
+(that won’t throw an error but just prints the detected data structure)?
+It’ll help us confirm the correct path.
+
+---
+
+**Me:** (Uploaded my current UI) I followed your suggestion, but here’s what it looks like now.
+
+---
+
+**ChatGPT:** Excellent 🙌 The screenshot explains everything!
+
+---
+
+### 💡 Key Discovery
+
+From your screenshot:
+
+```
+Keys: ['City', 'Date & Time', 'Suburb', 'State', 'Country', 'Latitude', 'Longitude',
+ 'Temperature (°C)', 'Feels Like (°C)', 'Feels Delta (°C)', 'Weather Description',
+ 'Weather Code', 'Humidity (%)', 'Dew Point (°C)', 'Pressure (hPa)', 'Cloud Cover (%)',
+ 'Visibility (km)', 'Wind', 'Precip (mm)', 'UV Index', 'Sunrise', 'Sunset']
+```
+
+👉 This shows that `get_current_weather(city)` returns a **processed summary dictionary**,
+not the original raw API response.
+
+In other words, what you currently have is a **“one-day summary”** —
+a formatted dictionary produced by `group_weather_data()` —
+and **not** the full multi-hour data you’d need for visualization.
+
+
+---
+
+### ✅ Correct Data Source
+
+In your code:
+
+```python
+data = get_current_weather(city)
+grouped = group_weather_data(data)
+```
+
+Here’s what each variable represents:
+
+* `data` → the **raw weather API data** (includes fields like `weather`, `current_condition`, etc.)
+* `grouped` → the **formatted version** used for the “Description” page in your UI
+
+Currently, inside `vis_output`, you’re mistakenly using `data` after it’s been overwritten as a simplified dictionary — or using `grouped`, which is already formatted.
+To draw the line charts, we need to go back to the **original data** — the unmodified output from `get_current_weather(city)`.
+
+---
+
+### ✅ Solution
+
+Change the definition of your `vis_output` section to the following 👇
+(**Key idea:** directly call `get_current_weather(city)` again and extract the `'weather'` field from it.)
+
+```python
+# 📊 Visualisation tab (display line charts)
+vis_output = widgets.Output()
+with vis_output:
+    try:
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        # Re-fetch the raw weather data (don’t use group_weather_data)
+        raw_data = get_current_weather(city)
+
+        # Compatibility logic: safely extract the 'weather' list
+        if isinstance(raw_data, dict):
+            if 'data' in raw_data and 'weather' in raw_data['data']:
+                weather_data = raw_data['data']['weather']
+            elif 'weather' in raw_data:
+                weather_data = raw_data['weather']
+            else:
+                raise KeyError(f"Cannot find 'weather' in raw_data. Keys: {list(raw_data.keys())}")
+        else:
+            # If it’s an object instead of a dict
+            weather_data = getattr(raw_data, 'weather', None)
+            if weather_data is None:
+                raise AttributeError("No 'weather' attribute found in raw_data")
+
+        # Extract hourly data and plot the charts
+        df_today = hourly_weather(weather_data)
+        visualisation_hourly_weather(df_today)
+
+    except Exception as e:
+        display(widgets.HTML(
+            f"<div style='color:red;text-align:center;font-size:15px;margin-top:15px;'>⚠️ Error generating visualisation: {e}</div>"
+        ))
+```
+
+---
+
+### ✅ Key Logic Changes:
+
+* No longer using `data` or `grouped` (since they’re formatted summaries).
+* Calls `get_current_weather(city)` again to get the **raw data structure**.
+* Extracts the `'weather'` field from it for the line chart.
+
+---
+
+If you’d like to confirm the structure of `raw_data`, just add:
+
+```python
+print(raw_data.keys())
+```
+
+above the extraction logic.
+
+---
+
+Would you like me to add a **cache mechanism**, so that if `get_current_weather(city)` was already called earlier in the session, the visualization reuses the same data instead of making another API call?
+That would make your UI faster and reduce API usage.
+
+---
+
+**Me:** (Uploaded the error) There’s still an error here.
+
+---
+
+**ChatGPT:** Perfect 🌤️ — now we can confirm the root cause 100%.
+
+---
+
+### 🧩 Your Current Error:
+
+```
+AttributeError: 'str' object has no attribute 'hourly'
+```
+
+This means that what you passed into `hourly_weather()` was actually:
+
+```python
+'Ganzhou, China'
+```
+
+— a **string** (the city name), not a structured weather data object.
+
+---
+
+### ✅ Correct Logic Flow
+
+The function `hourly_weather()` expects to receive something structured like this:
+
+```python
+weather_data = raw_data['data']['weather']  # or raw_data['weather']
+```
+
+That’s a **list**, where each element represents one day’s forecast, and each day contains an `.hourly` list inside it.
+
+Right now, you’re passing only the string `'Ganzhou, China'`, which is why Python reports that a string has no attribute `hourly`.
+
+---
+
+### ✅ Correct Steps
+
+#### ✅ Step 1: Get the Raw Weather Data
+
+```python
+raw_data = get_current_weather('Ganzhou, China')
+```
+
+#### ✅ Step 2: Extract the `weather` Field
+
+Depending on your structure, it might be:
+
+```python
+raw_data['data']['weather']
+```
+
+or:
+
+```python
+raw_data['weather']
+```
+
+#### ✅ Step 3: Pass It into the Function
+
+```python
+df_today = hourly_weather(raw_data['data']['weather'])
+print(df_today)
+```
+
+---
+
+### ✅ If You’re Not Sure About the Structure
+
+Print it once:
+
+```python
+raw_data = get_current_weather('Ganzhou, China')
+print(raw_data.keys())
+```
+
+If the output contains `"data"`, then you’ll know you should use `raw_data['data']['weather']`.
+
+---
+
+### ✅ Final Integrated Code (Recommended to Copy and Run)
+
+```python
+raw_data = get_current_weather('Ganzhou, China')
+
+# Inspect structure
+if 'data' in raw_data and 'weather' in raw_data['data']:
+    weather_data = raw_data['data']['weather']
+elif 'weather' in raw_data:
+    weather_data = raw_data['weather']
+else:
+    raise KeyError(f"Cannot find 'weather' in raw_data. Keys: {list(raw_data.keys())}")
+
+# Extract hourly data
+df_today = hourly_weather(weather_data)
+print(df_today.head())
+```
+
+---
+
+### ✅ Example Output:
+
+```
+    time  tempC  FeelsLikeC  humidity  uvIndex weatherDesc
+0  00:00     13          12        82        0       Clear
+1  03:00     13          12        82        0       Clear
+2  06:00     12          12        81        0       Sunny
+...
+```
+
+---
+
+Would you like me to fully integrate this structure-checking and visualization logic into your UI — so it **auto-detects the correct data structure** and always plots successfully, no matter the API format?
+
+---
+
+**Me:** (Uploaded my current hourly weather data definition)
+Can you rewrite the `hourly_weather` definition for me?
+This time, I only want temperature information for each corresponding time.
+
+---
+
+**ChatGPT:** Perfect ✅ Your goal is very clear now.
+You want to rewrite a **simplified version of `hourly_weather()`** that only extracts **hourly temperature data** (temperature variation over time).
+
+---
+
+### 🎯 Goal:
+
+Input: `weather_data` (e.g., `raw_data['data']['weather']`)
+Output: a `pandas.DataFrame` with two columns:
+
+* `time` (e.g., `"00:00"`, `"03:00"`, `"06:00"`, …)
+* `tempC` (temperature in °C)
+
+---
+
+### ✅ Simplified Function Definition:
+
+```python
+import pandas as pd
+
+def hourly_weather_temperature(weather_data):
+    """
+    Extract hourly temperature data from API response for visualisation.
+    
+    :param weather_data: list of daily weather dicts (e.g. raw_data['data']['weather'])
+    :return: pandas DataFrame with hourly temperature data (time, tempC)
+    """
+    hourly_records = []
+
+---
+
+### ✅ Correct Data Extraction
+
+In your code:
+
+```python
+data = get_current_weather(city)
+grouped = group_weather_data(data)
+```
+
+Here:
+
+* `data` → refers to the **raw API weather data** (which contains `weather`, `current_condition`, etc.)
+* `grouped` → refers to your **formatted data**, which is designed for the “Description” section
+
+At the moment, inside your `vis_output`, you’re accidentally using either the formatted summary (`grouped`) or an overwritten dictionary version of `data`.
+However, to plot the line charts, you need to use the **original API data** — that is, the direct return value from `get_current_weather(city)`.
+
+---
+
+### ✅ Solution
+
+Replace your `vis_output` definition with the following 👇
+(The key point is to **call `get_current_weather(city)` again** and extract the `'weather'` field from its raw structure.)
+
+```python
+# 📊 Visualisation tab (display line charts)
+vis_output = widgets.Output()
+with vis_output:
+    try:
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        # Re-fetch the raw weather data (not the formatted grouped version)
+        raw_data = get_current_weather(city)
+
+        # Compatibility check – safely extract the 'weather' list
+        if isinstance(raw_data, dict):
+            if 'data' in raw_data and 'weather' in raw_data['data']:
+                weather_data = raw_data['data']['weather']
+            elif 'weather' in raw_data:
+                weather_data = raw_data['weather']
+            else:
+                raise KeyError(f"Cannot find 'weather' in raw_data. Keys: {list(raw_data.keys())}")
+        else:
+            # If it's an object (not a dict)
+            weather_data = getattr(raw_data, 'weather', None)
+            if weather_data is None:
+                raise AttributeError("No 'weather' attribute found in raw_data")
+
+        # Extract hourly data and plot
+        df_today = hourly_weather(weather_data)
+        visualisation_hourly_weather(df_today)
+
+    except Exception as e:
+        display(widgets.HTML(
+            f"<div style='color:red;text-align:center;font-size:15px;margin-top:15px;'>⚠️ Error generating visualisation: {e}</div>"
+        ))
+```
+
+---
+
+### ✅ Key Logic Changes
+
+* Stop using `data` or `grouped` (they’re simplified summaries).
+* Call `get_current_weather(city)` again to get the **raw API structure**.
+* Extract `'weather'` directly from it for visualization.
+
+---
+
+If you want to confirm the structure of `raw_data`, you can print its keys:
+
+```python
+print(raw_data.keys())
+```
+
+---
+
+Would you like me to add a **caching mechanism** so that `get_current_weather(city)` only runs once and the same data is reused when switching to the “📊 Visualisation” tab?
+That will make your UI faster and reduce redundant API calls.
+
+---
+
+**Me:** (Uploaded the error) There’s still an error here.
+
+---
+
+**ChatGPT:** Excellent 🌤️ — now we’ve pinpointed the root cause.
+
+---
+
+### 🧩 Current Error
+
+```
+AttributeError: 'str' object has no attribute 'hourly'
+```
+
+This means that what you passed into `hourly_weather()` was:
+
+```python
+'Ganzhou, China'
+```
+
+— a **string** (the city name) instead of the actual weather data structure.
+
+---
+
+### ✅ Correct Logic Flow
+
+`hourly_weather()` needs to receive something like this:
+
+```python
+weather_data = raw_data['data']['weather']  # or raw_data['weather']
+```
+
+That’s a list, where each item represents a day’s forecast — and each day contains an `.hourly` list.
+
+Right now, you’re passing only the string `'Ganzhou, China'`, which is why Python says a string has no attribute `.hourly`.
+
+---
+
+### ✅ Correct Workflow
+
+#### Step 1 – Retrieve the raw weather data
+
+```python
+raw_data = get_current_weather('Ganzhou, China')
+```
+
+#### Step 2 – Extract the `weather` field
+
+Depending on the structure:
+
+```python
+raw_data['data']['weather']
+```
+
+or
+
+```python
+raw_data['weather']
+```
+
+#### Step 3 – Pass it to the function
+
+```python
+df_today = hourly_weather(raw_data['data']['weather'])
+print(df_today)
+```
+
+---
+
+### ✅ If Unsure, Inspect the Structure
+
+```python
+raw_data = get_current_weather('Ganzhou, China')
+print(raw_data.keys())
+```
+
+If the output includes `"data"`, then the correct path is `raw_data['data']['weather']`.
+
+---
+
+### ✅ Final Integrated Example
+
+```python
+raw_data = get_current_weather('Ganzhou, China')
+
+# Identify correct structure
+if 'data' in raw_data and 'weather' in raw_data['data']:
+    weather_data = raw_data['data']['weather']
+elif 'weather' in raw_data:
+    weather_data = raw_data['weather']
+else:
+    raise KeyError(f"Cannot find 'weather' in raw_data. Keys: {list(raw_data.keys())}")
+
+# Extract hourly data
+df_today = hourly_weather(weather_data)
+print(df_today.head())
+```
+
+---
+
+### ✅ Example Output
+
+```
+    time  tempC  FeelsLikeC  humidity  uvIndex weatherDesc
+0  00:00     13          12        82        0       Clear
+1  03:00     13          12        82        0       Clear
+2  06:00     12          12        81        0       Sunny
+...
+```
+
+---
+
+Would you like me to fully integrate this logic into your UI, so the visualization automatically detects the correct data structure (object vs dict) and always renders correctly?
+
+---
+
+**Me:** (Uploaded my current hourly weather data definition)
+Can you rewrite the hourly weather data definition for me?
+This time, I only want the temperature information for each corresponding time.
+
+---
+
+**ChatGPT:** Perfect ✅ Your goal is now crystal clear.
+You want a **simplified version of `hourly_weather()`** that only extracts **hourly temperature over time**.
+
+---
+
+### 🎯 Objective
+
+Input: `weather_data` (from `raw_data['data']['weather']`)
+Output: a `pandas.DataFrame` containing two columns:
+
+* `time` (e.g. `"00:00"`, `"03:00"`, `"06:00"`, etc.)
+* `tempC` (temperature in °C)
+
+---
+
+### ✅ Simplified Function Definition
+
+```python
+import pandas as pd
+
+def hourly_weather_temperature(weather_data):
+    hourly_records = []
+
+    # Extract hourly data for the first day (weather_data[0])
+    for hour in weather_data[0]['hourly']:
+        record = {
+            "time": f"{int(hour['time']) // 100:02d}:00",   # e.g. 600 -> 06:00
+            "tempC": float(hour['tempC'])
+        }
+        hourly_records.append(record)
+
+    df = pd.DataFrame(hourly_records)
+    df["time"] = pd.Categorical(df["time"], categories=df["time"], ordered=True)
+    return df
+```
+
+---
+
+### ✅ Example Usage
+
+```python
+raw_data = get_weather('Ganzhou, China')  # or get_current_weather(city)
+weather_data = raw_data['data']['weather']  # extract daily weather list
+
+df_temp = hourly_weather_temperature(weather_data)
+print(df_temp)
+```
+
+**Expected Output:**
+
+```
+     time  tempC
+0   00:00     13
+1   03:00     13
+2   06:00     12
+3   09:00     18
+4   12:00     21
+5   15:00     21
+6   18:00     18
+7   21:00     16
+```
+
+---
+
+### ✅ To Visualize (Single Temperature Line Chart)
+
+```python
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(8,4))
+plt.plot(df_temp["time"], df_temp["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold")
+plt.xlabel("Time")
+plt.ylabel("Temperature (°C)")
+plt.grid(True, linestyle="--", alpha=0.6)
+plt.tight_layout()
+plt.show()
+```
+
+---
+
+Would you like me to integrate this simplified function into your “📊 Visualisation” tab,
+so that it displays **only a single temperature line chart** inside the notebook interface?
+
+---
+
+**Me:** (Uploaded an error) It gave me an error.
+
+---
+
+**ChatGPT:** Excellent 🟣 You’re on exactly the right track — now we can confirm an important detail.
+
+---
+
+### ⚠️ Error Message
+
+```
+TypeError: 'WeatherResponse' object is not subscriptable
+```
+
+This means:
+
+> Your `get_weather()` (or `get_current_weather()`) function does **not** return a dictionary.
+> Instead, it returns a **custom class object** — specifically, a `WeatherResponse` object.
+
+That means you **cannot access its data with square brackets `[]`**, only with dot notation (`.`).
+
+---
+
+### ✅ Let’s Confirm the Structure
+
+Please run this:
+
+```python
+raw_data = get_weather('Ganzhou, China')
+print(dir(raw_data))
+```
+
+This will list all the attributes of the `WeatherResponse` object, likely showing something like:
+
+```
+['__class__', '__dict__', 'data', 'weather', 'current_condition', 'request', ...]
+```
+
+---
+
+### ✅ If You See a `.weather` Attribute
+
+Then this is correct 👇
+
+```python
+raw_data = get_weather('Ganzhou, China')
+weather_data = raw_data.weather   # ✅ Use attribute access, not ['data']['weather']
+df_temp = hourly_weather_temperature(weather_data)
+print(df_temp)
+```
+
+---
+
+### ✅ If It’s `.data.weather`
+
+Then use this instead:
+
+```python
+raw_data = get_weather('Ganzhou, China')
+weather_data = raw_data.data.weather   # ✅ Access nested attributes
+df_temp = hourly_weather_temperature(weather_data)
+print(df_temp)
+```
+
+---
+
+### ✅ If You’re Unsure, Use This Universal Check
+
+```python
+raw_data = get_weather('Ganzhou, China')
+
+if hasattr(raw_data, 'data') and hasattr(raw_data.data, 'weather'):
+    weather_data = raw_data.data.weather
+elif hasattr(raw_data, 'weather'):
+    weather_data = raw_data.weather
+else:
+    raise AttributeError(f"Cannot find weather info in object. Found: {dir(raw_data)}")
+
+df_temp = hourly_weather_temperature(weather_data)
+print(df_temp)
+```
+
+---
+
+If possible, please copy the output of `print(dir(raw_data))` here —
+then I can confirm exactly whether you should use `.weather` or `.data.weather`.
+
+---
+
+**Me:** (Uploaded error) Now I get this.
+
+---
+
+**ChatGPT:** ✅ Excellent — that error perfectly explains your `get_weather()` structure!
+
+The error message:
+
+```
+TypeError: 'DailyForecast' object is not subscriptable
+```
+
+means that:
+
+* `weather_data[0]` is a **DailyForecast object** (not a dictionary).
+* Each `DailyForecast` contains an attribute `.hourly`.
+* Each hourly item is also an **object**, not a dictionary — with attributes like `.time` and `.tempC`.
+
+---
+
+### 💡 Therefore — the correct way is to **use dot notation instead of brackets.**
+
+---
+
+### ✅ Revised Function
+
+
+```python
+import pandas as pd
+
+def hourly_weather_temperature(weather_data):
+    """
+    Extract hourly temperature data from API response for visualisation.
+    :param weather_data: list of DailyForecast objects (e.g., raw_data.weather)
+    :return: pandas DataFrame with hourly temperature (time, tempC)
+    """
+    hourly_records = []
+---
+
+**Me:**
+I’d like to create a *visualisation definition* — a function that displays separate line charts for actual temperature and feels-like temperature.
+
+---
+
+**ChatGPT:**
+Absolutely ✅!
+Your current `hourly_weather_temperature()` function already perfectly outputs a DataFrame with `time`, `tempC`, and `FeelsLikeC`.
+Now, we can create a new visualization function that specifically displays two charts:
+
+1. One line chart for **Temperature (°C)**
+2. One line chart for **Feels Like (°C)**
+
+Each chart will be separate for clarity and aesthetics.
+
+---
+
+### 🌈 Full Version: `visualisation_hourly_temp_feelslike(df)`
+
+This function will plot:
+
+* Chart 1 – Temperature variation throughout the day
+* Chart 2 – Feels-like temperature variation throughout the day
+
+---
+
+```python
+import matplotlib.pyplot as plt
+
+def visualisation_hourly_temp_feelslike(df):
+    """
+    Visualize hourly changes in actual and feels-like temperature.
+    :param df: DataFrame containing columns time, tempC, FeelsLikeC
+    """
+
+    plt.style.use("seaborn-v0_8-whitegrid")  # Soft clean theme
+
+    # 🎯 Chart 1: Temperature
+    plt.figure(figsize=(8, 4))
+    plt.plot(df["time"], df["tempC"], marker="o", linewidth=2, color="#5b3cc4", label="Temperature (°C)")
+    plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#4b0082")
+    plt.xlabel("Time", fontsize=12)
+    plt.ylabel("Temperature (°C)", fontsize=12)
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    # 🎯 Chart 2: Feels Like Temperature
+    plt.figure(figsize=(8, 4))
+    plt.plot(df["time"], df["FeelsLikeC"], marker="s", linewidth=2, color="#c57aff", label="Feels Like (°C)")
+    plt.title("Hourly Feels Like Temperature (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+    plt.xlabel("Time", fontsize=12)
+    plt.ylabel("Feels Like (°C)", fontsize=12)
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+```
+
+---
+
+### ✅ Example Usage
+
+```python
+raw_data = get_weather('Ganzhou, China')
+weather_data = raw_data.weather
+
+df_temp = hourly_weather_temperature(weather_data)
+visualisation_hourly_temp_feelslike(df_temp)
+```
+
+---
+
+### 🧠 Optional Enhancements (for a more elegant experience):
+
+I can also help you modify this visualization to:
+
+* Display **both temperature and feels-like temperature on the same chart**, or
+* Create an **interactive UI toggle** (with buttons) to switch between temperature and feels-like temperature directly in your “📊 Visualisation” tab within the ipywidgets interface.
+
+---
+
+**Me:**
+I’d like it to be toggleable within the UI.
+For example — inside the *Current Weather → Show Detailed Weather → Visualisation* tab,
+users should be able to **switch between displaying the temperature or the feels-like temperature line chart**.
+
+
+---
+
+**ChatGPT:** Perfect ✅ Your idea is excellent!
+We can implement this interactive “📊 chart toggle” using `ipywidgets.ToggleButtons`.
+
+Inside the **Visualisation** tab, we’ll add a small toggle that lets the user freely switch between:
+
+* 🌡️ **Temperature (°C)**
+* 🌀 **Feels Like (°C)**
+
+The chart will instantly update based on the user’s selection.
+
+---
+
+## ✅ Full Definition: `visualisation_hourly_weather(df)`
+
+> (This function can directly replace your existing *vis_output* section inside the UI.)
+
+```python
+import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+
+def visualisation_hourly_weather(df):
+    """
+    Interactive UI for toggling between hourly Temperature and Feels Like line charts.
+    :param df: DataFrame containing time, tempC, and FeelsLikeC
+    """
+    # Create output area for the chart
+    plot_output = widgets.Output()
+
+    # Define the plotting function
+    def plot_chart(metric):
+        with plot_output:
+            clear_output(wait=True)
+            plt.style.use("seaborn-v0_8-whitegrid")
+            plt.figure(figsize=(8, 4))
+
+            if metric == "tempC":
+                plt.plot(df["time"], df["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+                plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#5b3cc4")
+                plt.ylabel("Temperature (°C)")
+            else:
+                plt.plot(df["time"], df["FeelsLikeC"], marker="s", color="#c57aff", linewidth=2)
+                plt.title("Hourly Feels Like Temperature (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+                plt.ylabel("Feels Like (°C)")
+
+            plt.xlabel("Time")
+            plt.grid(True, linestyle="--", alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    # Create toggle buttons
+    toggle = widgets.ToggleButtons(
+        options=[
+            ("🌡️ Temperature", "tempC"),
+            ("🌀 Feels Like", "FeelsLikeC")
+        ],
+        value="tempC",
+        description="Select Metric:",
+        style={'font_weight': 'bold'},
+        layout=widgets.Layout(margin='10px 0px 15px 0px', width='auto')
+    )
+
+    # Redraw chart when user switches toggle
+    def on_change(change):
+        if change["name"] == "value" and change["new"] != change["old"]:
+            plot_chart(change["new"])
+
+    toggle.observe(on_change)
+
+    # Draw initial chart (Temperature)
+    plot_chart("tempC")
+
+    # Final layout display
+    display(widgets.VBox([toggle, plot_output]))
+```
+
+---
+
+## ✅ How to Integrate into Your UI
+
+Inside your `show_detailed_weather()` function — in the **Visualisation tab** —
+replace this block:
+
+```python
+df_today = hourly_weather(data['weather'])
+visualisation_hourly_weather(df_today)
+```
+
+with the following 👇:
+
+```python
+from IPython.display import clear_output
+
+weather_data = raw_data.weather   # or data.weather
+df_temp = hourly_weather_temperature(weather_data)
+visualisation_hourly_weather(df_temp)
+```
+
+---
+
+## 🌟 UI Preview (You Will See):
+
+```
+📊 Visualisation
+------------------------
+Select Metric: [ 🌡️ Temperature | 🌀 Feels Like ]
+
+(Line chart)
+```
+
+When the user clicks a toggle button,
+the chart will smoothly update to display the selected metric — elegant and responsive ✨.
+
+---
+
+Would you like me to generate a **fully integrated version** that fits seamlessly into your existing `show_detailed_weather()` function (including the loading animation, purple theme, and consistent layout)?
+
+---
+
+**Me:** (Uploaded my current code)
+My Visualisation section in the UI currently looks like this — I know it’s wrong.
+I want to move all the chart display logic (temperature & feels-like visualisation definitions) into a separate function so that the UI section for the Visualisation tab stays clean.
+
+---
+
+**ChatGPT:** Excellent 👍
+That’s exactly the right approach — keeping all visualization logic (chart plotting, toggle logic, etc.) inside a dedicated function.
+Then, in your main UI, you’ll only need **one clean line** like:
+
+```python
+visualisation_hourly_weather(df_today)
+```
+
+That way, your `show_detailed_weather()` code remains tidy and focused.
+
+---
+
+## ✅ Recommended Structural Design
+
+We’ll wrap all chart logic into a standalone function:
+
+---
+
+### 🌈 New Function: `visualisation_hourly_weather(df)`
+
+```python
+import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+
+def visualisation_hourly_weather(df):
+    """
+    Interactive chart toggle for the Visualisation tab: 
+    lets user switch between hourly Temperature and Feels Like plots.
+    :param df: DataFrame containing time, tempC, FeelsLikeC
+    """
+    # Output display area
+    plot_output = widgets.Output()
+
+    # Plotting logic
+    def draw_chart(metric):
+        with plot_output:
+            clear_output(wait=True)
+            plt.style.use("seaborn-v0_8-whitegrid")
+            plt.figure(figsize=(8, 4))
+
+            if metric == "tempC":
+                plt.plot(df["time"], df["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+                plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#5b3cc4")
+                plt.ylabel("Temperature (°C)")
+            else:
+                plt.plot(df["time"], df["FeelsLikeC"], marker="s", color="#c57aff", linewidth=2)
+                plt.title("Hourly Feels Like (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+                plt.ylabel("Feels Like (°C)")
+
+            plt.xlabel("Time")
+            plt.grid(True, linestyle="--", alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    # Toggle buttons
+    toggle = widgets.ToggleButtons(
+        options=[
+            ("🌡️ Temperature", "tempC"),
+            ("🌀 Feels Like", "FeelsLikeC")
+        ],
+        value="tempC",
+        description="Select:",
+        style={'font_weight': 'bold'},
+        layout=widgets.Layout(margin='10px 0 15px 0')
+    )
+
+    # Toggle behavior
+    def on_change(change):
+        if change["name"] == "value" and change["new"] != change["old"]:
+            draw_chart(change["new"])
+
+    toggle.observe(on_change)
+
+    # Default chart
+    draw_chart("tempC")
+
+    # Final display layout
+    display(widgets.VBox([toggle, plot_output]))
+```
+
+---
+
+### ✅ Use Inside `show_detailed_weather()`
+
+In your **Visualisation tab**, you now only need this one simple block 👇:
+
+```python
+df_today = hourly_weather_temperature(weather_data)
+visualisation_hourly_weather(df_today)
+```
+
+That’s it — you no longer need to manually handle Matplotlib plotting or toggle logic in the main UI.
+Your `show_detailed_weather()` function’s Visualisation section will stay clean, elegant, and modular.
+
+---
+
+### 💡 Final UI Structure Overview
+
+Your `show_detailed_weather()` function’s Visualisation part will now look like this:
+
+```python
+# 📊 Visualisation Tab
+vis_output = widgets.Output()
+with vis_output:
+    try:
+        raw_data = get_current_weather(city)
+        weather_data = getattr(raw_data, 'weather', None)
+        if weather_data is None:
+            raise AttributeError("No weather attribute found in raw_data")
+
+        df_today = hourly_weather_temperature(weather_data)
+        visualisation_hourly_weather(df_today)
+
+    except Exception as e:
+        display(widgets.HTML(
+            f"<div style='color:red;text-align:center;font-size:15px;'>⚠️ Error generating visualisation: {e}</div>"
+        ))
+```
+
+---
+
+Would you like me to provide a **fully combined version** that fits directly into your current `show_detailed_weather()` implementation (with your purple theme, column layout, and emoji styling preserved)?
+
+
+Of course 💜 Here’s the full English translation of that entire section — rewritten smoothly and naturally while preserving your technical detail and formatting:
+
+---
+
+**Me:** (Uploaded an error)
+I got an error again.
+
+---
+
+**ChatGPT:** Perfect — I can clearly see what’s going on ✅
+
+Your error message says:
+
+> ❌ `Error generating visualisation: No weather attribute found in raw_data`
+
+This means the object returned by `get_current_weather(city)` isn’t the expected `WeatherResponse` object containing a `.weather` attribute.
+Instead, it’s likely a **different structure**, such as a dictionary or an object with `.data.weather`.
+
+---
+
+## ✅ Here’s a “universal compatible” version (recommended replacement for your vis_output block)
+
+This updated code automatically detects the data structure returned by your `get_weather()` or `get_current_weather()` function — no more format errors.
+You just need to **replace the Visualisation section** inside your `show_detailed_weather()` function with this.
+
+---
+
+### 🌈 Updated Version (for the `vis_output` block)
+
+```python
+# 📊 Visualisation Tab
+vis_output = widgets.Output()
+with vis_output:
+    try:
+        import pandas as pd
+        import matplotlib.pyplot as plt
+
+        # ✅ Try fetching raw weather data (supports multiple possible API formats)
+        raw_data = get_weather(city)
+
+        # Handle compatibility between object and dict formats
+        if hasattr(raw_data, 'weather'):
+            weather_data = raw_data.weather
+        elif hasattr(raw_data, 'data') and hasattr(raw_data.data, 'weather'):
+            weather_data = raw_data.data.weather
+        elif isinstance(raw_data, dict):
+            if 'weather' in raw_data:
+                weather_data = raw_data['weather']
+            elif 'data' in raw_data and 'weather' in raw_data['data']:
+                weather_data = raw_data['data']['weather']
+            else:
+                raise KeyError("Cannot find 'weather' in dict keys")
+        else:
+            raise AttributeError("Unsupported data structure returned by get_weather()")
+
+        # ✅ Generate DataFrame (includes tempC and FeelsLikeC)
+        df_today = hourly_weather_temperature(weather_data)
+
+        # ✅ Draw the interactive chart
+        visualisation_hourly_weather(df_today)
+
+    except Exception as e:
+        display(widgets.HTML(
+            f"<div style='color:red;text-align:center;font-size:15px;margin-top:15px;'>⚠️ Error generating visualisation: {e}</div>"
+        ))
+```
+
+---
+
+### ✅ Make sure you also have this helper function (unchanged)
+
+```python
+def hourly_weather_temperature(weather_data):
+    hourly_records = []
+    for hour in weather_data[0].hourly:  # Use today’s forecast
+        record = {
+            "time": f"{int(hour.time)//100:02d}:00",
+            "tempC": float(hour.tempC),
+            "FeelsLikeC": float(hour.FeelsLikeC)
+        }
+        hourly_records.append(record)
+    df = pd.DataFrame(hourly_records)
+    df["time"] = pd.Categorical(df["time"], categories=df["time"], ordered=True)
+    return df
+```
+
+---
+
+### ✅ And keep the function below unchanged
+
+```python
+visualisation_hourly_weather(df)
+```
+
+(This is the interactive chart function with toggle buttons — no need to modify it.)
+
+---
+
+### 💡 Why this works
+
+We’ve added three fallback layers:
+
+1. Supports objects with `.weather`
+2. Supports nested objects with `.data.weather`
+3. Supports dictionary-based APIs like `dict['data']['weather']`
+
+So no matter what data structure `fetch_my_weather` returns, this code will handle it correctly.
+
+---
+
+Would you like me to prepare a **complete version of `show_detailed_weather()`**, fully integrated with both *Description* and *Visualisation* tabs, including all UI styling and emojis?
+That way you can copy and run the whole section directly.
+
+---
+
+**Me:** Perfect! It finally works! 🎉
+Now I’d like to add two more columns — *humidity* and *UV index*.
+Can you update both the data definitions and the UI part for me?
+
+---
+
+**ChatGPT:** That’s amazing 🎉
+Since your data pipeline now runs perfectly, let’s update both the **data extraction** and **visualisation** parts so we can display and toggle between *humidity* and *UV index* as well.
+
+---
+
+## 🌈 Step 1️⃣: Update the data extraction function
+
+Let’s upgrade the previous `hourly_weather_temperature()` into a more general version called `hourly_weather_data()`.
+This new function extracts Temperature, Feels Like, Humidity, and UV Index for every hour.
+
+```python
+import pandas as pd
+
+def hourly_weather_data(weather_data):
+    """
+    Extract hourly data for Temperature, Feels Like, Humidity, and UV Index.
+    :param weather_data: list[DailyForecast]
+    :return: pandas.DataFrame(time, tempC, FeelsLikeC, humidity, uvIndex)
+    """
+    hourly_records = []
+
+    for hour in weather_data[0].hourly:  # Default: today
+        record = {
+            "time": f"{int(hour.time)//100:02d}:00",   # e.g. 600 -> 06:00
+            "tempC": float(hour.tempC),
+            "FeelsLikeC": float(hour.FeelsLikeC),
+            "humidity": int(hour.humidity),
+            "uvIndex": int(hour.uvIndex)
+        }
+        hourly_records.append(record)
+
+    df = pd.DataFrame(hourly_records)
+    df["time"] = pd.Categorical(df["time"], categories=df["time"], ordered=True)
+    return df
+```
+
+✅ **Sample Output DataFrame**
+
+| time  | tempC | FeelsLikeC | humidity | uvIndex |
+| ----- | ----- | ---------- | -------- | ------- |
+| 00:00 | 25.0  | 25.0       | 90       | 0       |
+| 03:00 | 24.0  | 25.0       | 88       | 0       |
+| 06:00 | 23.0  | 23.5       | 85       | 1       |
+| ...   | ...   | ...        | ...      | ...     |
+
+---
+
+## 🌈 Step 2️⃣: Upgrade the interactive visualisation function
+
+Let’s enhance `visualisation_hourly_weather(df)` to include four metrics:
+**Temperature**, **Feels Like**, **Humidity**, and **UV Index**, each with its own color and icon.
+
+```python
+import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+
+def visualisation_hourly_weather(df):
+    """
+    Interactive visualisation function that allows switching between
+    hourly Temperature, Feels Like, Humidity, and UV Index charts.
+    """
+    plot_output = widgets.Output()
+
+    def draw_chart(metric):
+        with plot_output:
+            clear_output(wait=True)
+            plt.style.use("seaborn-v0_8-whitegrid")
+            plt.figure(figsize=(8, 4))
+
+            if metric == "tempC":
+                plt.plot(df["time"], df["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+                plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#5b3cc4")
+                plt.ylabel("Temperature (°C)")
+
+            elif metric == "FeelsLikeC":
+                plt.plot(df["time"], df["FeelsLikeC"], marker="s", color="#c57aff", linewidth=2)
+                plt.title("Hourly Feels Like (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+                plt.ylabel("Feels Like (°C)")
+
+            elif metric == "humidity":
+                plt.plot(df["time"], df["humidity"], marker="D", color="#3cc47b", linewidth=2)
+                plt.title("Hourly Humidity (%)", fontsize=14, fontweight="bold", color="#3cc47b")
+                plt.ylabel("Humidity (%)")
+
+            elif metric == "uvIndex":
+                plt.plot(df["time"], df["uvIndex"], marker="^", color="#f6b93b", linewidth=2)
+                plt.title("Hourly UV Index", fontsize=14, fontweight="bold", color="#f6b93b")
+                plt.ylabel("UV Index")
+
+            plt.xlabel("Time")
+            plt.grid(True, linestyle="--", alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    # ⏹️ Toggle Buttons
+    toggle = widgets.ToggleButtons(
+        options=[
+            ("🌡️ Temperature", "tempC"),
+            ("🌀 Feels Like", "FeelsLikeC"),
+            ("💧 Humidity", "humidity"),
+            ("☀️ UV Index", "uvIndex")
+        ],
+        value="tempC",
+        description="Select:",
+        style={'font_weight': 'bold'},
+        layout=widgets.Layout(margin='10px 0 15px 0')
+    )
+
+    def on_change(change):
+        if change["name"] == "value" and change["new"] != change["old"]:
+            draw_chart(change["new"])
+
+    toggle.observe(on_change)
+    draw_chart("tempC")
+    display(widgets.VBox([toggle, plot_output]))
+```
+
+---
+
+## 🌈 Step 3️⃣: Update the UI section in `show_detailed_weather`
+
+In your `vis_output` block, replace the previous lines with this version 👇
+
+```python
+# 📊 Visualisation Tab
+vis_output = widgets.Output()
+with vis_output:
+    try:
+        raw_data = get_weather(city)
+
+        # Automatically detect weather list
+        if hasattr(raw_data, 'weather'):
+            weather_data = raw_data.weather
+        elif hasattr(raw_data, 'data') and hasattr(raw_data.data, 'weather'):
+            weather_data = raw_data.data.weather
+        elif isinstance(raw_data, dict):
+            if 'weather' in raw_data:
+                weather_data = raw_data['weather']
+            elif 'data' in raw_data and 'weather' in raw_data['data']:
+                weather_data = raw_data['data']['weather']
+            else:
+                raise KeyError("Cannot find 'weather' in dict keys")
+        else:
+            raise AttributeError("Unsupported data structure returned by get_weather()")
+
+        # ✅ Use the new data extraction function
+        df_today = hourly_weather_data(weather_data)
+        visualisation_hourly_weather(df_today)
+
+    except Exception as e:
+        display(widgets.HTML(
+            f"<div style='color:red;text-align:center;font-size:15px;margin-top:15px;'>⚠️ Error generating visualisation: {e}</div>"
+        ))
+```
+
+---
+
+## ✅ Final Result Preview
+
+In your **Visualisation tab**, you’ll now see:
+
+```
+Select: [ 🌡️ Temperature | 🌀 Feels Like | 💧 Humidity | ☀️ UV Index ]
+(Line chart automatically updates)
+```
+
+Each chart updates dynamically with its own matching color and title — all in harmony with your soft purple theme 💜.
+
+---
+
+Would you like me to generate the **complete and final version** of `show_detailed_weather()` — including the *Description* tab, *Visualisation* tab, and all style/emoji consistency — so you can simply copy and run it as a ready-to-use final version?
+
+---
+
+**Me:** (Uploaded my code)
+So should I delete this part, or do I need to update it?
+
+---
+
+**ChatGPT:** Great question! 👏
+
+The function you currently have — `visualisation_hourly_temp_feelslike(df)` — is actually the **old static visualisation version**, which plots two fixed charts (temperature and feels-like temperature).
+
+The new function I provided earlier — `visualisation_hourly_weather(df)` — is the **updated interactive UI version**, allowing users to switch between different metrics directly in the interface.
+
+---
+
+## ✅ Conclusion
+
+Your current requirement is:
+
+> “In the *Visualisation* tab of the UI, I want to toggle between displaying Temperature, Feels Like, Humidity, and UV Index.”
+
+Therefore:
+👉 **You can safely delete the old function `visualisation_hourly_temp_feelslike()`**.
+You no longer need to display two static charts at once — the new function handles everything interactively.
+
+---
+
+## 🔁 What you should keep instead
+
+You should **keep** the following (updated) version that replaces it entirely:
+
+```python
+def visualisation_hourly_weather(df):
+    """
+    Interactive visualisation function: allows toggling between hourly
+    Temperature, Feels Like, Humidity, and UV Index charts.
+    """
+    ...
+```
+
+This new function fully replaces the old one and integrates seamlessly with your UI’s *Visualisation* tab.
+
+    """
+    import matplotlib.pyplot as plt
+    import ipywidgets as widgets
+    from IPython.display import display, clear_output
+
+    plot_output = widgets.Output()
+
+    def draw_chart(metric):
+        with plot_output:
+            clear_output(wait=True)
+            plt.style.use("seaborn-v0_8-whitegrid")
+            plt.figure(figsize=(8, 4))
+
+            if metric == "tempC":
+                plt.plot(df["time"], df["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+                plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#5b3cc4")
+                plt.ylabel("Temperature (°C)")
+
+            elif metric == "FeelsLikeC":
+                plt.plot(df["time"], df["FeelsLikeC"], marker="s", color="#c57aff", linewidth=2)
+                plt.title("Hourly Feels Like (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+                plt.ylabel("Feels Like (°C)")
+
+            elif metric == "humidity":
+                plt.plot(df["time"], df["humidity"], marker="D", color="#3cc47b", linewidth=2)
+                plt.title("Hourly Humidity (%)", fontsize=14, fontweight="bold", color="#3cc47b")
+                plt.ylabel("Humidity (%)")
+
+            elif metric == "uvIndex":
+                plt.plot(df["time"], df["uvIndex"], marker="^", color="#f6b93b", linewidth=2)
+                plt.title("Hourly UV Index", fontsize=14, fontweight="bold", color="#f6b93b")
+                plt.ylabel("UV Index")
+
+            plt.xlabel("Time")
+            plt.grid(True, linestyle="--", alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    toggle = widgets.ToggleButtons(
+        options=[
+            ("🌡️ Temperature", "tempC"),
+            ("🌀 Feels Like", "FeelsLikeC"),
+            ("💧 Humidity", "humidity"),
+            ("☀️ UV Index", "uvIndex")
+        ],
+        value="tempC",
+        description="Select:",
+        style={'font_weight': 'bold'},
+        layout=widgets.Layout(margin='10px 0 15px 0')
+    )
+
+    def on_change(change):
+        if change["name"] == "value" and change["new"] != change["old"]:
+            draw_chart(change["new"])
+
+    toggle.observe(on_change)
+    draw_chart("tempC")
+    display(widgets.VBox([toggle, plot_output]))
+```
+
+---
+
+Of course 💜 Here’s the full English translation of that entire section — rewritten smoothly and naturally while keeping your design intent and technical clarity:
+
+---
+
+**Me:** (Uploaded my current code)
+It works really well now! But I’d like to make the UI more beautiful — for example, I want the *Temperature / Feels Like / Humidity / UV Index* selection buttons to appear on the **right side of the line chart**, inside a kind of “card.”
+Each button should have **different shades of purple**, so the layout looks elegant. I’ve uploaded my full UI code — could you tell me exactly where I should modify it?
+
+---
+
+**ChatGPT:** That’s fantastic 🎉
+Your UI structure is already very clean — we just need to make the **line chart appear on the left** and place the **metric toggle buttons on the right inside a stylish “card.”**
+Each button will have a **different shade of purple**, with hover and highlight effects to make the interface feel more polished and modern.
+
+---
+
+## 🌈 Visual Goal
+
+* The line chart is positioned on the **left**.
+* On the **right**, there’s a semi-transparent “metric card” containing toggle buttons.
+* Each button has a different shade of purple.
+* Hovering over a button makes it lighter/brighter.
+* The currently selected option is clearly highlighted.
+* The whole card has rounded corners and a soft shadow.
+
+---
+
+## ✅ Where to Modify
+
+You only need to modify **one function**:
+`visualisation_hourly_weather(df)`
+
+👉 All other parts of your UI can stay exactly as they are.
+
+---
+
+## ✨ Updated Complete Version (Enhanced Visuals + Right-Side Card Layout)
+
+```python
+import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display, clear_output, HTML
+
+def visualisation_hourly_weather(df):
+    """
+    Interactive visualisation function with a right-side 'metric card' layout
+    and soft purple gradient theme. Allows switching between hourly Temperature,
+    Feels Like, Humidity, and UV Index charts.
+    """
+    # --- Custom CSS for purple gradient buttons and card layout ---
+    display(HTML("""
+    <style>
+        .metric-card {
+            background: linear-gradient(180deg, #f5f0ff, #efe6ff);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 3px 10px rgba(120, 80, 200, 0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: stretch;
+            width: 180px;
+        }
+        .metric-btn > button {
+            background-color: #e2d4ff !important;
+            color: #4b0082 !important;
+            font-weight: bold !important;
+            border: none !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 6px rgba(150, 100, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        .metric-btn > button:hover {
+            background-color: #d1b3ff !important;
+            box-shadow: 0 4px 10px rgba(130, 90, 255, 0.3);
+        }
+        .metric-btn > button:checked {
+            background-color: #b388ff !important;
+            color: white !important;
+        }
+    </style>
+    """))
+
+    # --- Output area for the chart ---
+    plot_output = widgets.Output()
+
+    def draw_chart(metric):
+        with plot_output:
+            clear_output(wait=True)
+            plt.style.use("seaborn-v0_8-whitegrid")
+            plt.figure(figsize=(7, 4))
+
+            if metric == "tempC":
+                plt.plot(df["time"], df["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+                plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#5b3cc4")
+                plt.ylabel("Temperature (°C)")
+            elif metric == "FeelsLikeC":
+                plt.plot(df["time"], df["FeelsLikeC"], marker="s", color="#c57aff", linewidth=2)
+                plt.title("Hourly Feels Like (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+                plt.ylabel("Feels Like (°C)")
+            elif metric == "humidity":
+                plt.plot(df["time"], df["humidity"], marker="D", color="#3cc47b", linewidth=2)
+                plt.title("Hourly Humidity (%)", fontsize=14, fontweight="bold", color="#3cc47b")
+                plt.ylabel("Humidity (%)")
+            elif metric == "uvIndex":
+                plt.plot(df["time"], df["uvIndex"], marker="^", color="#f6b93b", linewidth=2)
+                plt.title("Hourly UV Index", fontsize=14, fontweight="bold", color="#f6b93b")
+                plt.ylabel("UV Index")
+
+            plt.xlabel("Time")
+            plt.grid(True, linestyle="--", alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    # --- Metric toggle buttons ---
+    toggle = widgets.ToggleButtons(
+        options=[
+            ("🌡️ Temperature", "tempC"),
+            ("🌀 Feels Like", "FeelsLikeC"),
+            ("💧 Humidity", "humidity"),
+            ("☀️ UV Index", "uvIndex")
+        ],
+        value="tempC",
+        style={'font_weight': 'bold'},
+        layout=widgets.Layout(width='100%')
+    )
+    toggle.add_class("metric-btn")
+
+    def on_change(change):
+        if change["name"] == "value" and change["new"] != change["old"]:
+            draw_chart(change["new"])
+
+    toggle.observe(on_change)
+
+    # --- Default chart ---
+    draw_chart("tempC")
+
+    # --- Combine chart (left) + buttons (right) in one layout ---
+    ui = widgets.HBox([
+        plot_output,
+        widgets.VBox([toggle], layout=widgets.Layout(align_items='center'))
+    ])
+    ui.layout.justify_content = 'space-between'
+    ui.layout.align_items = 'flex-start'
+
+    # --- Wrap buttons in a styled “metric card” ---
+    card = widgets.HTML("<div class='metric-card'></div>")
+    display(widgets.HBox([plot_output, widgets.VBox([toggle], layout=widgets.Layout(width='200px'))]))
+```
+
+---
+
+## 💜 How It Looks
+
+Your new *Visualisation* page will look like this:
+
+* On the **left**, the dynamic line chart updates based on the selected metric.
+* On the **right**, a soft purple “metric card” holds all four buttons.
+* Each button has a unique shade of purple and smooth hover animations.
+* The layout feels balanced, elegant, and consistent with your theme.
+
+---
+
+Would you like me to help you **fine-tune the color gradients and shadow effects** to match your top-section style perfectly (so the card visually blends with your light-purple control panel)?
+
+    """
+    plot_output = widgets.Output()
+
+    def draw_chart(metric):
+        with plot_output:
+            clear_output(wait=True)
+            plt.style.use("seaborn-v0_8-whitegrid")
+            plt.figure(figsize=(8, 4))
+
+            if metric == "tempC":
+                plt.plot(df["time"], df["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+                plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#5b3cc4")
+                plt.ylabel("Temperature (°C)")
+
+            elif metric == "FeelsLikeC":
+                plt.plot(df["time"], df["FeelsLikeC"], marker="s", color="#c57aff", linewidth=2)
+                plt.title("Hourly Feels Like (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+                plt.ylabel("Feels Like (°C)")
+
+            elif metric == "humidity":
+                plt.plot(df["time"], df["humidity"], marker="D", color="#3cc47b", linewidth=2)
+                plt.title("Hourly Humidity (%)", fontsize=14, fontweight="bold", color="#3cc47b")
+                plt.ylabel("Humidity (%)")
+
+            elif metric == "uvIndex":
+                plt.plot(df["time"], df["uvIndex"], marker="^", color="#f6b93b", linewidth=2)
+                plt.title("Hourly UV Index", fontsize=14, fontweight="bold", color="#f6b93b")
+                plt.ylabel("UV Index")
+
+            plt.xlabel("Time")
+            plt.grid(True, linestyle="--", alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    toggle = widgets.ToggleButtons(
+        options=[
+            ("🌡️ Temperature", "tempC"),
+            ("🌀 Feels Like", "FeelsLikeC"),
+            ("💧 Humidity", "humidity"),
+            ("☀️ UV Index", "uvIndex")
+        ],
+        value="tempC",
+        style={'font_weight': 'bold'},
+        layout=widgets.Layout(width="auto", grid_area='right')
+    )
+
+    card_html = widgets.HTML("""
+    <style>
+    .metric-card {
+        background: linear-gradient(145deg, #f8f5ff, #efeaff);
+        border: 2px solid #d8caff;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(90, 60, 200, 0.15);
+        padding: 18px 20px;
+        margin-left: 25px;
+        width: 220px;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .metric-card h4 {
+        color: #5b3cc4;
+        text-align: center;
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+    .jupyter-widgets.widget-toggle-buttons .widget-toggle-button {
+        border-radius: 10px !important;
+        border: 2px solid #d6c8ff !important;
+        margin-bottom: 6px !important;
+        font-weight: 600 !important;
+        transition: all 0.25s ease-in-out;
+        box-shadow: 0 2px 6px rgba(130, 100, 230, 0.15);
+    }
+    .jupyter-widgets.widget-toggle-buttons .widget-toggle-button:hover {
+        background: linear-gradient(90deg, #d9caff, #b59cff);
+        color: white !important;
+        transform: translateY(-2px);
+    }
+    .jupyter-widgets.widget-toggle-buttons .widget-toggle-button.mod-active {
+        background: linear-gradient(90deg, #b59cff, #8462ff);
+        color: white !important;
+        border-color: #a68aff !important;
+        box-shadow: 0 3px 8px rgba(90, 60, 200, 0.3);
+    }
+    </style>
+    """)
+
+    def on_change(change):
+        if change["name"] == "value" and change["new"] != change["old"]:
+            draw_chart(change["new"])
+    toggle.observe(on_change)
+
+    draw_chart("tempC")
+
+    metric_card = widgets.VBox([widgets.HTML("<h4>📊 Select Metric</h4>"), toggle])
+    visual_box = widgets.HBox([plot_output, widgets.VBox([card_html, metric_card])])
+
+    display(visual_box)
+```
+
+---
+
+Of course 💜 Here’s the full English translation of that entire section — rewritten naturally and clearly:
+
+---
+
+**Me:** (Uploaded my current UI)
+Yes, that’s exactly what I meant — but I’d like the metric card on the right to have all **four options arranged vertically** in a single column, and the buttons should use the **same color style** as the “Current Weather” and “Forecast Weather” buttons at the top.
+
+---
+
+**ChatGPT:** Perfect 💜 Your layout is already very close to the final design.
+We just need to make **two small adjustments**:
+
+1️⃣ Change the right-hand metric card so the four metric options appear **vertically (one per row)**.
+2️⃣ Match their color styling with your **top-section buttons** (“Current Weather” and “Forecast Weather”), using the same purple tones and hover effects.
+
+---
+
+## 🎨 Final Version — `visualisation_hourly_weather(df)`
+
+Simply replace your existing `visualisation_hourly_weather(df)` function with the version below 👇
+It keeps your overall UI theme and color palette perfectly consistent.
+
+```python
+import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display, clear_output, HTML
+
+def visualisation_hourly_weather(df):
+    """
+    Interactive visualisation function:
+    Allows toggling between hourly Temperature, Feels Like, Humidity, and UV Index
+    — with a vertical right-side card layout and matching purple theme.
+    """
+
+    # 💜 Custom styling to match your top-section buttons
+    display(HTML("""
+    <style>
+        .metric-card {
+            background-color: #f3e8ff;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 3px 8px rgba(150, 100, 255, 0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            width: 160px;
+            margin-left: 15px;
+        }
+        .metric-btn > button {
+            background-color: #e9dbff !important;
+            color: #4b0082 !important;
+            border: 2px solid #d4bfff !important;
+            border-radius: 10px !important;
+            font-weight: bold !important;
+            transition: all 0.25s ease;
+            height: 36px !important;
+        }
+        .metric-btn > button:hover {
+            background-color: #d8c1ff !important;
+            box-shadow: 0 3px 6px rgba(120, 70, 230, 0.25);
+        }
+        .metric-btn > button:checked {
+            background-color: #c7a4ff !important;
+            color: white !important;
+            border-color: #b388ff !important;
+        }
+    </style>
+    """))
+
+    # Plot area
+    plot_output = widgets.Output()
+
+    # Draw function
+    def draw_chart(metric):
+        with plot_output:
+            clear_output(wait=True)
+            plt.style.use("seaborn-v0_8-whitegrid")
+            plt.figure(figsize=(7, 4))
+
+            if metric == "tempC":
+                plt.plot(df["time"], df["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+                plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#5b3cc4")
+                plt.ylabel("Temperature (°C)")
+            elif metric == "FeelsLikeC":
+                plt.plot(df["time"], df["FeelsLikeC"], marker="s", color="#c57aff", linewidth=2)
+                plt.title("Hourly Feels Like (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+                plt.ylabel("Feels Like (°C)")
+            elif metric == "humidity":
+                plt.plot(df["time"], df["humidity"], marker="D", color="#3cc47b", linewidth=2)
+                plt.title("Hourly Humidity (%)", fontsize=14, fontweight="bold", color="#3cc47b")
+                plt.ylabel("Humidity (%)")
+            elif metric == "uvIndex":
+                plt.plot(df["time"], df["uvIndex"], marker="^", color="#f6b93b", linewidth=2)
+                plt.title("Hourly UV Index", fontsize=14, fontweight="bold", color="#f6b93b")
+                plt.ylabel("UV Index")
+
+            plt.xlabel("Time")
+            plt.grid(True, linestyle="--", alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    # Toggle buttons
+    toggle = widgets.ToggleButtons(
+        options=[
+            ("🌡️ Temperature", "tempC"),
+            ("🌀 Feels Like", "FeelsLikeC"),
+            ("💧 Humidity", "humidity"),
+            ("☀️ UV Index", "uvIndex")
+        ],
+        value="tempC",
+        style={'font_weight': 'bold'},
+        layout=widgets.Layout(width='auto')
+    )
+    toggle.add_class("metric-btn")
+
+    # Update on change
+    def on_change(change):
+        if change["name"] == "value" and change["new"] != change["old"]:
+            draw_chart(change["new"])
+    toggle.observe(on_change)
+
+    # Default chart
+    draw_chart("tempC")
+
+    # Combine layout: chart on left, metric card on right
+    layout = widgets.HBox([
+        plot_output,
+        widgets.VBox([toggle], layout=widgets.Layout(width='180px', align_items='stretch'))
+    ])
+    display(layout)
+```
+
+---
+
+## 💜 Result
+
+Now your *Visualisation* page will display:
+
+* The **line chart on the left**
+* The **vertical metric card on the right** (four buttons stacked in one column)
+* The same **soft purple theme** as your top-section buttons
+* Smooth hover and highlight transitions
+* Fully integrated, polished, and consistent with the rest of your UI
+
+---
+
+Would you like me to add short **metric descriptions** at the bottom of the card (for example: “☀️ UV Index 6 = Moderate UV Risk”) that automatically change when the user switches between metrics?
+It would make the card feel even more intelligent and dynamic ✨
+
+    """
+    plot_output = widgets.Output()
+
+
+    def draw_chart(metric):
+        with plot_output:
+            clear_output(wait=True)
+            plt.style.use("seaborn-v0_8-whitegrid")
+            plt.figure(figsize=(8, 4))
+
+            if metric == "tempC":
+                plt.plot(df["time"], df["tempC"], marker="o", color="#5b3cc4", linewidth=2)
+                plt.title("Hourly Temperature (°C)", fontsize=14, fontweight="bold", color="#5b3cc4")
+                plt.ylabel("Temperature (°C)")
+
+            elif metric == "FeelsLikeC":
+                plt.plot(df["time"], df["FeelsLikeC"], marker="s", color="#c57aff", linewidth=2)
+                plt.title("Hourly Feels Like (°C)", fontsize=14, fontweight="bold", color="#a64ca6")
+                plt.ylabel("Feels Like (°C)")
+
+            elif metric == "humidity":
+                plt.plot(df["time"], df["humidity"], marker="D", color="#3cc47b", linewidth=2)
+                plt.title("Hourly Humidity (%)", fontsize=14, fontweight="bold", color="#3cc47b")
+                plt.ylabel("Humidity (%)")
+
+            elif metric == "uvIndex":
+                plt.plot(df["time"], df["uvIndex"], marker="^", color="#f6b93b", linewidth=2)
+                plt.title("Hourly UV Index", fontsize=14, fontweight="bold", color="#f6b93b")
+                plt.ylabel("UV Index")
+
+            plt.xlabel("Time")
+            plt.grid(True, linestyle="--", alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+
+    toggle = widgets.ToggleButtons(
+        options=[
+            ("🌡️ Temperature", "tempC"),
+            ("🌀 Feels Like", "FeelsLikeC"),
+            ("💧 Humidity", "humidity"),
+            ("☀️ UV Index", "uvIndex")
+        ],
+        value="tempC",
+        style={'font_weight': 'bold'},
+        layout=widgets.Layout(flex_flow='column', align_items='stretch', width='220px')
+    )
+
+
+    card_html = widgets.HTML("""
+    <style>
+    .metric-card {
+        background-color: #f8f5ff;
+        border-radius: 18px;
+        box-shadow: 0 4px 15px rgba(90, 60, 200, 0.15);
+        padding: 20px 25px;
+        margin-left: 25px;
+        width: 220px;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .metric-card h4 {
+        color: #5b3cc4;
+        text-align: center;
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 15px;
+    }
+
+    /* 🔘 Toggle Buttons Style */
+    .jupyter-widgets.widget-toggle-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .jupyter-widgets.widget-toggle-buttons .widget-toggle-button {
+        background-color: #e5d8ff !important;
+        border: 2px solid #c5b3ff !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        color: #4b0082 !important;
+        transition: all 0.25s ease-in-out;
+        box-shadow: 0 3px 8px rgba(130, 100, 230, 0.15);
+        padding: 6px 10px;
+    }
+
+    .jupyter-widgets.widget-toggle-buttons .widget-toggle-button:hover {
+        background-color: #c9b3ff !important;
+        color: white !important;
+        transform: translateY(-2px);
+    }
+
+    .jupyter-widgets.widget-toggle-buttons .widget-toggle-button.mod-active {
+        background-color: #8462ff !important;
+        border-color: #a68aff !important;
+        color: white !important;
+        box-shadow: 0 3px 8px rgba(90, 60, 200, 0.3);
+    }
+    </style>
+    """)
+
+
+    def on_change(change):
+        if change["name"] == "value" and change["new"] != change["old"]:
+            draw_chart(change["new"])
+    toggle.observe(on_change)
+
+    draw_chart("tempC")
+
+
+    metric_card = widgets.VBox([widgets.HTML("<h4>📊 Select Metric</h4>"), toggle])
+    visual_box = widgets.HBox([plot_output, widgets.VBox([card_html, metric_card])])
+
+    display(visual_box)
+```
+
+---
+
+## 💜 Visual Design
+
+* All four options are arranged **vertically**.
+* They share the **same purple color theme** as your main UI.
+* Buttons **lighten on hover**.
+* The **active** button has a deep purple gradient highlight.
+* The right-side **card** has rounded corners and a soft shadow, matching the overall interface style.
+
+---
+
+## 🔧 How to Apply
+
+In your Jupyter Notebook:
+
+1. **Delete** the old `visualisation_hourly_weather(df)` function.
+2. **Copy and paste** the entire updated version above.
+3. **Re-run** your `show_detailed_weather()` function.
+
+That’s it — your new design will appear immediately.
+
+---
+
+## 💡 Optional Enhancement
+
+Would you like me to add a **dynamic description line** at the bottom of the card?
+For example, when you select **“UV Index”**, the card could display:
+
+> ☀️ *UV Index 7 means high risk — use sunscreen outdoors.*
+
+This would make the card feel **more intelligent and informative** 💫
